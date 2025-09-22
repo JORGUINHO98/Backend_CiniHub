@@ -1,0 +1,25 @@
+# Django + REST Framework
+django==5.0.6
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+
+# Base de datos PostgreSQL
+psycopg2-binary==2.9.9
+
+# Cache Redis
+django-redis==5.4.0
+redis==5.0.1
+
+# Servidor WSGI para producción
+gunicorn==21.2.0
+
+# Peticiones HTTP
+requests==2.32.3
+
+# Validación y seguridad
+python-decouple==3.8
+django-environ==0.11.2
+
+# Monitoreo y logging
+django-extensions==3.2.3

@@ -1,0 +1,76 @@
+services:
+  web:
+    build: .
+    command:  python manage.py runserver 0.0.0.0:8050
+    volumes:
+      - .:/app
+    ports:
+      - "8050:8050"
+    env_file:
+      - .env
+    environment:
+      - DJANGO_ALLOWED_HOSTS=*
+    restart: unless-stopped
+    networks:
+      - cinehub_network
+
+  db:
+    image: postgres:15-alpine
+    container_name: cinehub_db
+    environment:
+      POSTGRES_DB: cinehub_db
+      POSTGRES_USER: cinehub_user
+      POSTGRES_PASSWORD: cinehub_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=en_US.UTF-8"
+      LC_ALL: en_US.UTF-8
+      LANG: en_US.UTF-8
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - cinehub_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cinehub_user -d cinehub_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: cinehub_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@cinehub.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - cinehub_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: cinehub_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - cinehub_network
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  cinehub_network:
+    driver: bridge
