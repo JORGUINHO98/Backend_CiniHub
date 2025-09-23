@@ -2,6 +2,7 @@
 from rest_framework import serializers
 from .models import Usuario, Rol, Permiso, Favorito, Visto, PlanSuscripcion, Suscripcion, HistorialPago, Pelicula
 
+
 class UsuarioSerializer(serializers.ModelSerializer):
     suscripcion_activa = serializers.SerializerMethodField()
 
@@ -19,9 +20,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
         return None
 
 
+# 🔑 Agregado para el login
 class UsuarioLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
+
 
 class UsuarioRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6, error_messages={
@@ -58,19 +61,20 @@ class UsuarioRegisterSerializer(serializers.ModelSerializer):
         return value.strip()
 
     def create(self, validated_data):
+        user = Usuario(
+            email=validated_data["email"],
+            nombre=validated_data["nombre"],
+            telefono=validated_data.get("telefono", ""),
+            pais=validated_data.get("pais", "")
+        )
+        user.set_password(validated_data["password"])
         try:
-            user = Usuario(
-                email=validated_data["email"],
-                nombre=validated_data["nombre"],
-                telefono=validated_data.get("telefono", ""),
-                pais=validated_data.get("pais", "")
-            )
-            user.set_password(validated_data["password"])
             user.save()
-            return user
         except Exception as e:
-            print(f"Error creating user: {str(e)}")
+            import traceback
+            traceback.print_exc()  # 🔥 Esto imprime toda la traza en los logs
             raise serializers.ValidationError(f"Error al crear el usuario: {str(e)}")
+        return user
 
 
 class PermisoSerializer(serializers.ModelSerializer):

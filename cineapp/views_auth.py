@@ -1,3 +1,4 @@
+# cineapp/views_auth.py
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -8,11 +9,15 @@ from django.utils import timezone
 from datetime import timedelta
 
 from .models import Usuario, PlanSuscripcion, Suscripcion, HistorialPago
-from .serializers import (UsuarioRegisterSerializer, UsuarioSerializer, UsuarioLoginSerializer,
-                         PlanSuscripcionSerializer, SuscripcionSerializer, 
-                         CrearSuscripcionSerializer, HistorialPagoSerializer)
+from .serializers import (
+    UsuarioRegisterSerializer, UsuarioSerializer, UsuarioLoginSerializer,
+    PlanSuscripcionSerializer, SuscripcionSerializer,
+    CrearSuscripcionSerializer, HistorialPagoSerializer
+)
 
+# =========================
 # Registro
+# =========================
 class RegisterView(generics.CreateAPIView):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioRegisterSerializer
@@ -49,7 +54,9 @@ class RegisterView(generics.CreateAPIView):
                 'details': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# Login personalizado con validación
+# =========================
+# Login personalizado
+# =========================
 class LoginView(APIView):
     permission_classes = (AllowAny,)
     
@@ -66,30 +73,34 @@ class LoginView(APIView):
                     jwt_serializer = EmailTokenObtainPairSerializer(data=request.data)
                     if jwt_serializer.is_valid():
                         return Response(jwt_serializer.validated_data, status=status.HTTP_200_OK)
-                else:
-                    return Response({"error": "Credenciales inválidas"}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"error": "Credenciales inválidas"}, status=status.HTTP_401_UNAUTHORIZED)
             except Usuario.DoesNotExist:
                 return Response({"error": "Usuario no encontrado"}, status=status.HTTP_401_UNAUTHORIZED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Logout - Solo confirma que el token se invalidó en el cliente
+# =========================
+# Logout
+# =========================
 class LogoutView(APIView):
     permission_classes = (AllowAny,)
     
     def post(self, request):
         # En JWT, el logout se maneja en el cliente eliminando el token
-        # No necesitamos hacer nada en el servidor
         return Response({"message": "Sesión cerrada exitosamente"}, status=status.HTTP_200_OK)
 
-# Login con email
+# =========================
+# JWT con email
+# =========================
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = "email"
+
 
 class EmailTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
 
-# Perfil (requiere token JWT)
+# =========================
+# Perfil
+# =========================
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -99,9 +110,8 @@ class ProfileView(APIView):
         return Response(serializer.data)
 
 # =========================
-# VISTAS DE SUSCRIPCIÓN
+# Vistas de Suscripción
 # =========================
-
 class PlanesSuscripcionView(APIView):
     permission_classes = [AllowAny]
     
@@ -109,6 +119,7 @@ class PlanesSuscripcionView(APIView):
         planes = PlanSuscripcion.objects.filter(es_activo=True)
         serializer = PlanSuscripcionSerializer(planes, many=True)
         return Response(serializer.data)
+
 
 class SuscripcionUsuarioView(APIView):
     permission_classes = [IsAuthenticated]
@@ -145,7 +156,7 @@ class SuscripcionUsuarioView(APIView):
             ).update(estado='cancelada')
             
             # Crear nueva suscripción
-            fecha_fin = timezone.now() + timedelta(days=30)  # 30 días de prueba
+            fecha_fin = timezone.now() + timedelta(days=30)  # 30 días de validez
             suscripcion = Suscripcion.objects.create(
                 usuario=request.user,
                 plan=plan,
@@ -166,6 +177,7 @@ class SuscripcionUsuarioView(APIView):
         
         return Response(serializer.errors, status=400)
 
+
 class CancelarSuscripcionView(APIView):
     permission_classes = [IsAuthenticated]
     
@@ -183,6 +195,7 @@ class CancelarSuscripcionView(APIView):
         suscripcion.save()
         
         return Response({"message": "Suscripción cancelada exitosamente"})
+
 
 class HistorialPagosView(APIView):
     permission_classes = [IsAuthenticated]

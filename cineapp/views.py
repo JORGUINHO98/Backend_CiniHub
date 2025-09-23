@@ -5,9 +5,16 @@ from rest_framework import status
 from django.core.cache import cache
 import requests
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 
 from .models import Pelicula, Usuario, Favorito, Visto
-from django.shortcuts import get_object_or_404
+
+
+from .serializers import UsuarioRegisterSerializer, UsuarioSerializer
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_API_KEY = settings.TMDB_API_KEY
 
 # ============================
@@ -27,9 +34,10 @@ def normalize_movie(movie):
 def normalize_user(user: Usuario):
     return {
         "id": user.id,
-        "username": user.username,
         "email": user.email,
         "nombre": user.nombre or "",
+        "is_active": user.is_active,
+        "fecha_registro": user.fecha_registro,
     }
 
 # ============================
@@ -102,6 +110,7 @@ def pelicula_detalle(request, pk):
     elif request.method == 'DELETE':
         pelicula.delete()
         return Response({"mensaje": "Pelicula eliminada"}, status=204)
+
 # ============================
 # CRUD Usuario
 # ============================
@@ -110,26 +119,18 @@ def pelicula_detalle(request, pk):
 def usuarios(request):
     if request.method == 'GET':
         usuarios = Usuario.objects.all()
-        return Response([normalize_user(u) for u in usuarios])
+        return Response(UsuarioSerializer(usuarios, many=True).data)
 
     elif request.method == 'POST':
-        data = request.data
-        if not data.get("username") or not data.get("password") or not data.get("email"):
-            return Response({"error": "username, email y password son obligatorios"}, status=400)
+        serializer = UsuarioRegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response(UsuarioSerializer(user).data, status=201)
+        return Response(serializer.errors, status=400)
 
-        if Usuario.objects.filter(username=data["username"]).exists():
-            return Response({"error": "El username ya existe"}, status=400)
-
-        user = Usuario(
-            username=data["username"],
-            email=data["email"],
-            nombre=data.get("nombre", "")
-        )
-        user.set_password(data["password"])
-        user.save()
-        return Response(normalize_user(user), status=201)
 
 @api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def usuario_detalle(request, pk):
     try:
         usuario = Usuario.objects.get(pk=pk)
@@ -137,17 +138,14 @@ def usuario_detalle(request, pk):
         return Response({"error": "Usuario no encontrado"}, status=404)
 
     if request.method == 'GET':
-        return Response(normalize_user(usuario))
+        return Response(UsuarioSerializer(usuario).data)
 
     elif request.method == 'PUT':
-        data = request.data
-        usuario.username = data.get("username", usuario.username)
-        usuario.email = data.get("email", usuario.email)
-        usuario.nombre = data.get("nombre", usuario.nombre)
-        if data.get("password"):
-            usuario.set_password(data["password"])
-        usuario.save()
-        return Response(normalize_user(usuario))
+        serializer = UsuarioRegisterSerializer(usuario, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(UsuarioSerializer(usuario).data)
+        return Response(serializer.errors, status=400)
 
     elif request.method == 'DELETE':
         usuario.delete()
@@ -207,6 +205,46 @@ def tmdb_buscar(request):
         return Response(result)
     return Response({"error": "No se pudo obtener"}, status=400)
 
+
+@api_view(["GET"])
+def tmdb_detalle(request, movie_id):
+    """Obtiene detalles + créditos (actores/director) de una película"""
+    try:
+        # Detalles básicos
+        detalle_url = f"{TMDB_BASE_URL}/movie/{movie_id}"
+        detalle_params = {"api_key": TMDB_API_KEY, "language": "es-ES"}
+        detalle_res = requests.get(detalle_url, params=detalle_params).json()
+
+        # Créditos (cast y crew)
+        creditos_url = f"{TMDB_BASE_URL}/movie/{movie_id}/credits"
+        creditos_params = {"api_key": TMDB_API_KEY, "language": "es-ES"}
+        creditos_res = requests.get(creditos_url, params=creditos_params).json()
+
+        # Actores principales (máx 5)
+        actores = [actor["name"] for actor in creditos_res.get("cast", [])[:5]]
+
+        # Director
+        director = next(
+            (c["name"] for c in creditos_res.get("crew", []) if c["job"] == "Director"),
+            "Desconocido"
+        )
+
+        data = {
+            "id": detalle_res.get("id"),
+            "titulo": detalle_res.get("title"),
+            "descripcion": detalle_res.get("overview"),
+            "poster": f"https://image.tmdb.org/t/p/w500{detalle_res.get('poster_path')}" if detalle_res.get("poster_path") else None,
+            "fecha_lanzamiento": detalle_res.get("release_date"),
+            "duracion": detalle_res.get("runtime"),
+            "generos": [g["name"] for g in detalle_res.get("genres", [])],
+            "actores": actores,
+            "director": director,
+        }
+
+        return Response(data)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+    
 # ============================
 # Favoritos
 # ============================
@@ -313,14 +351,28 @@ def update_profile(request):
     user = request.user
     data = request.data
 
-    user.nombre = data.get("nombre", user.nombre)
-    user.email = data.get("email", user.email)
+    serializer = UsuarioRegisterSerializer(user, data=data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"mensaje": "Perfil actualizado", "usuario": UsuarioSerializer(user).data})
+    return Response(serializer.errors, status=400)
+# ============================
+# TMDb - Estrenos (now_playing)
+# ============================
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def tmdb_estrenos(request):
+    cache_key = "tmdb_estrenos"
+    cached = cache.get(cache_key)
+    if cached:
+        return Response(cached)
 
-    if data.get("password_actual") and data.get("password_nueva"):
-        if user.check_password(data["password_actual"]):
-            user.set_password(data["password_nueva"])
-        else:
-            return Response({"error": "Contraseña actual incorrecta"}, status=400)
-
-    user.save()
-    return Response({"mensaje": "Perfil actualizado", "usuario": normalize_user(user)})
+    url = "https://api.themoviedb.org/3/movie/now_playing"
+    params = {"api_key": TMDB_API_KEY, "language": "es-ES", "page": 1}
+    res = requests.get(url, params=params, timeout=10)
+    if res.status_code == 200:
+        data = res.json()
+        movies = [normalize_movie(m) for m in data.get("results", [])]
+        cache.set(cache_key, movies, 3600)
+        return Response(movies)
+    return Response({"error": "No se pudo obtener"}, status=400)

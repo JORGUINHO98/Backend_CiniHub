@@ -1,7 +1,9 @@
 services:
   web:
     build: .
-    command:  python manage.py runserver 0.0.0.0:8050
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8050"
     volumes:
       - .:/app
     ports:
@@ -10,7 +12,11 @@ services:
       - .env
     environment:
       - DJANGO_ALLOWED_HOSTS=*
+      - DJANGO_SETTINGS_MODULE=cinehub_project.settings 
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - cinehub_network
 
@@ -34,9 +40,9 @@ services:
       - cinehub_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cinehub_user -d cinehub_db"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   pgadmin:
     image: dpage/pgadmin4:latest
