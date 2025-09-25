@@ -248,45 +248,106 @@ def tmdb_detalle(request, movie_id):
 # ============================
 # Favoritos
 # ============================
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def favoritos(request):
-    favoritos = Favorito.objects.filter(usuario=request.user).select_related("pelicula")
-    data = [
-        {
-            "id": fav.pelicula.tmdb_id,
-            "title": fav.pelicula.titulo,
-            "overview": fav.pelicula.descripcion,
-            "poster_path": fav.pelicula.poster,
-            "release_date": fav.pelicula.fecha_lanzamiento,
+    if request.method == 'GET':
+        favoritos = Favorito.objects.filter(usuario=request.user).select_related("pelicula")
+        data = [
+            {
+                "id": fav.pelicula.tmdb_id,
+                "title": fav.pelicula.titulo,
+                "overview": fav.pelicula.descripcion,
+                "poster_path": fav.pelicula.poster,
+                "release_date": fav.pelicula.fecha_lanzamiento,
+                "vote_average": 0,
+                "genre_ids": []
+            }
+            for fav in favoritos
+        ]
+        return Response(data)
+
+    elif request.method == 'POST':
+        data = request.data
+        tmdb_id = data.get("tmdb_id")
+        if not tmdb_id:
+            return Response({"error": "Se requiere tmdb_id"}, status=400)
+
+        pelicula, _ = Pelicula.objects.get_or_create(
+            tmdb_id=tmdb_id,
+            defaults={
+                "titulo": data.get("title", ""),
+                "descripcion": data.get("overview", ""),
+                "poster": data.get("poster_path"),
+                "fecha_lanzamiento": data.get("release_date"),
+            }
+        )
+        favorito, created = Favorito.objects.get_or_create(usuario=request.user, pelicula=pelicula)
+        if not created:
+            return Response({"mensaje": "Ya estaba en favoritos"}, status=200)
+
+        return Response({
+            "id": pelicula.tmdb_id,
+            "title": pelicula.titulo,
+            "overview": pelicula.descripcion,
+            "poster_path": pelicula.poster,
+            "release_date": pelicula.fecha_lanzamiento,
             "vote_average": 0,
             "genre_ids": []
-        }
-        for fav in favoritos
-    ]
-    return Response(data)
+        }, status=201)
+
 
 # ============================
 # Vistos
 # ============================
-@api_view(['GET'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def vistos(request):
-    vistos = Visto.objects.filter(usuario=request.user).select_related("pelicula")
-    data = [
-        {
-            "id": v.pelicula.tmdb_id,
-            "title": v.pelicula.titulo,
-            "overview": v.pelicula.descripcion,
-            "poster_path": v.pelicula.poster,
-            "release_date": v.pelicula.fecha_lanzamiento,
+    if request.method == 'GET':
+        vistos = Visto.objects.filter(usuario=request.user).select_related("pelicula")
+        data = [
+            {
+                "id": v.pelicula.tmdb_id,
+                "title": v.pelicula.titulo,
+                "overview": v.pelicula.descripcion,
+                "poster_path": v.pelicula.poster,
+                "release_date": v.pelicula.fecha_lanzamiento,
+                "vote_average": 0,
+                "genre_ids": []
+            }
+            for v in vistos
+        ]
+        return Response(data)
+
+    elif request.method == 'POST':
+        data = request.data
+        tmdb_id = data.get("tmdb_id")
+        if not tmdb_id:
+            return Response({"error": "Se requiere tmdb_id"}, status=400)
+
+        pelicula, _ = Pelicula.objects.get_or_create(
+            tmdb_id=tmdb_id,
+            defaults={
+                "titulo": data.get("title", ""),
+                "descripcion": data.get("overview", ""),
+                "poster": data.get("poster_path"),
+                "fecha_lanzamiento": data.get("release_date"),
+            }
+        )
+        visto, created = Visto.objects.get_or_create(usuario=request.user, pelicula=pelicula)
+        if not created:
+            return Response({"mensaje": "Ya estaba en vistos"}, status=200)
+
+        return Response({
+            "id": pelicula.tmdb_id,
+            "title": pelicula.titulo,
+            "overview": pelicula.descripcion,
+            "poster_path": pelicula.poster,
+            "release_date": pelicula.fecha_lanzamiento,
             "vote_average": 0,
             "genre_ids": []
-        }
-        for v in vistos
-    ]
-    return Response(data)
-
+        }, status=201)
+        
 # ============================
 # Favorito detalle
 # ============================
