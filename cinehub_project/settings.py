@@ -11,7 +11,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ========================
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", get_random_secret_key())
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "*").split(",")
+
+# Incluye IP pública, localhost y 127.0.0.1
+ALLOWED_HOSTS = os.environ.get(
+    "DJANGO_ALLOWED_HOSTS", "3.12.189.221,localhost,127.0.0.1"
+).split(",")
 
 # ========================
 # Aplicaciones
@@ -88,7 +92,6 @@ CACHES = {
     }
 }
 
-
 # ========================
 # Archivos estáticos
 # ========================
@@ -134,7 +137,6 @@ TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 # ========================
 # CORS
 # ========================
-
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:19006",
     "http://127.0.0.1:19006",
@@ -145,14 +147,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8082",
     "http://127.0.0.1:8082",
     "http://192.168.0.10:8082",  # Expo dev web
+    "http://3.12.189.221",        # AWS backend para producción
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8050",
     "http://127.0.0.1:8050",
     "http://192.168.0.10:8050",
+    "http://3.12.189.221",        # AWS para requests con CSRF
 ]
-
 
 # ========================
 # Seguridad básica

@@ -1,6 +1,9 @@
 # cineapp/serializers.py
 from rest_framework import serializers
-from .models import Usuario, Rol, Permiso, Favorito, Visto, PlanSuscripcion, Suscripcion, HistorialPago, Pelicula
+from .models import (
+    Usuario, Rol, Permiso, Favorito, Visto,
+    PlanSuscripcion, Suscripcion, HistorialPago, Pelicula
+)
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
@@ -14,37 +17,57 @@ class UsuarioSerializer(serializers.ModelSerializer):
         ]
 
     def get_suscripcion_activa(self, obj):
-        suscripcion = obj.suscripciones.filter(estado='activa').first()
+        suscripcion = obj.suscripciones.filter(estado="activa").first()
         if suscripcion and suscripcion.esta_activa:
             return SuscripcionSerializer(suscripcion).data
         return None
 
 
-# 🔑 Agregado para el login
+# 🔑 Login
 class UsuarioLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
 
 
+# 🔑 Registro
 class UsuarioRegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6, error_messages={
-        'min_length': 'La contraseña debe tener al menos 6 caracteres.',
-        'blank': 'La contraseña no puede estar vacía.'
-    })
-    email = serializers.EmailField(error_messages={
-        'invalid': 'Ingresa un email válido.',
-        'blank': 'El email no puede estar vacío.'
-    })
-    nombre = serializers.CharField(max_length=150, error_messages={
-        'max_length': 'El nombre no puede tener más de 150 caracteres.',
-        'blank': 'El nombre no puede estar vacío.'
-    })
-    telefono = serializers.CharField(required=False, allow_blank=True, max_length=20, error_messages={
-        'max_length': 'El teléfono no puede tener más de 20 caracteres.'
-    })
-    pais = serializers.CharField(required=False, allow_blank=True, max_length=100, error_messages={
-        'max_length': 'El país no puede tener más de 100 caracteres.'
-    })
+    password = serializers.CharField(
+        write_only=True,
+        min_length=6,
+        error_messages={
+            "min_length": "La contraseña debe tener al menos 6 caracteres.",
+            "blank": "La contraseña no puede estar vacía.",
+        },
+    )
+    email = serializers.EmailField(
+        error_messages={
+            "invalid": "Ingresa un email válido.",
+            "blank": "El email no puede estar vacío.",
+        }
+    )
+    nombre = serializers.CharField(
+        max_length=150,
+        error_messages={
+            "max_length": "El nombre no puede tener más de 150 caracteres.",
+            "blank": "El nombre no puede estar vacío.",
+        },
+    )
+    telefono = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=20,
+        error_messages={
+            "max_length": "El teléfono no puede tener más de 20 caracteres."
+        },
+    )
+    pais = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=100,
+        error_messages={
+            "max_length": "El país no puede tener más de 100 caracteres."
+        },
+    )
 
     class Meta:
         model = Usuario
@@ -65,18 +88,19 @@ class UsuarioRegisterSerializer(serializers.ModelSerializer):
             email=validated_data["email"],
             nombre=validated_data["nombre"],
             telefono=validated_data.get("telefono", ""),
-            pais=validated_data.get("pais", "")
+            pais=validated_data.get("pais", ""),
         )
         user.set_password(validated_data["password"])
         try:
             user.save()
         except Exception as e:
-            import traceback
-            traceback.print_exc()  # 🔥 Esto imprime toda la traza en los logs
             raise serializers.ValidationError(f"Error al crear el usuario: {str(e)}")
         return user
 
 
+# ====================
+# Otros Serializers
+# ====================
 class PermisoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Permiso
@@ -102,9 +126,24 @@ class VistoSerializer(serializers.ModelSerializer):
 
 
 class PeliculaSerializer(serializers.ModelSerializer):
+    is_favorite = serializers.SerializerMethodField()
+    is_watched = serializers.SerializerMethodField()
+
     class Meta:
         model = Pelicula
         fields = "__all__"
+
+    def get_is_favorite(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return Favorito.objects.filter(usuario=request.user, pelicula=obj).exists()
+        return False
+
+    def get_is_watched(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return Visto.objects.filter(usuario=request.user, pelicula=obj).exists()
+        return False
 
 
 class PlanSuscripcionSerializer(serializers.ModelSerializer):

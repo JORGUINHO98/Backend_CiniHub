@@ -70,17 +70,29 @@ class Rol(models.Model):
 # =========================
 # FAVORITOS Y VISTOS
 # =========================
+# cineapp/models.py  (reemplazar las clases Favorito y Visto actuales)
+
 class Favorito(models.Model):
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="favoritos",
         on_delete=models.CASCADE
     )
-    id_pelicula = models.IntegerField()
+    # Cambiado de id_pelicula = IntegerField() a FK
+    pelicula = models.ForeignKey(
+        "Pelicula",
+        related_name="favoritos",
+        on_delete=models.CASCADE
+    )
     lista_de_pelicula = models.IntegerField(null=True, blank=True)
 
+    class Meta:
+        unique_together = ("usuario", "pelicula")
+        verbose_name = "Favorito"
+        verbose_name_plural = "Favoritos"
+
     def __str__(self):
-        return f"Favorito {self.id_pelicula} de {self.usuario}"
+        return f"Favorito {self.pelicula_id} de {self.usuario}"
 
 
 class Visto(models.Model):
@@ -89,16 +101,27 @@ class Visto(models.Model):
         related_name="vistos",
         on_delete=models.CASCADE
     )
-    id_pelicula = models.IntegerField()  # ID de TMDb
-    titulo = models.CharField(max_length=255)
+    # Cambiado de id_pelicula = IntegerField() a FK
+    pelicula = models.ForeignKey(
+        "Pelicula",
+        related_name="vistos",
+        on_delete=models.CASCADE
+    )
+    # Se puede mantener calificacion/note/porcentaje como antes
     calificacion = models.IntegerField(null=True, blank=True)
     fecha_visto = models.DateTimeField(auto_now_add=True)
     nota_personal = models.TextField(blank=True)
     porcentaje_visto = models.IntegerField(default=100)
 
-    def __str__(self):
-        return f"{self.titulo} visto por {self.usuario}"
+    class Meta:
+        unique_together = ("usuario", "pelicula")
+        verbose_name = "Visto"
+        verbose_name_plural = "Vistos"
 
+    def __str__(self):
+        # usa el titulo de la película si existe
+        titulo = self.pelicula.titulo if self.pelicula_id and hasattr(self.pelicula, "titulo") else getattr(self, "titulo", "")
+        return f"{titulo} visto por {self.usuario}"
 
 # =========================
 # PELICULA

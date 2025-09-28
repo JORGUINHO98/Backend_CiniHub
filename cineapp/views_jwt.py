@@ -7,29 +7,24 @@ from .serializers_jwt import EmailTokenObtainPairSerializer
 from .serializers import UsuarioSerializer
 from .models import Visto, Favorito
 
-# ✅ Login con email
+# ✅ Login con email (JWT)
 class EmailTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
 
-# ✅ Perfil con métricas incluidas (respuesta aplanada)
+# ✅ Perfil con métricas
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         serializer = UsuarioSerializer(request.user)
-
-        # Métricas adicionales
         vistos = Visto.objects.filter(usuario=request.user)
         favoritos = Favorito.objects.filter(usuario=request.user)
-
         promedio = (
             round(sum(v.calificacion or 0 for v in vistos) / len(vistos), 1)
             if len(vistos) > 0 else 0
         )
-
-        # 👇 Devolvemos todo plano, fácil de consumir en frontend
         return Response({
-            **serializer.data,  # Se expande el dict con los datos del usuario
+            **serializer.data,
             "stats": {
                 "vistos": len(vistos),
                 "favoritos": len(favoritos),
